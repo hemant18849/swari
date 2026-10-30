@@ -288,6 +288,40 @@ export function cancelBooking(bookingId) {
 }
 
 /**
+ * Driver accepts an open user-created ride request
+ */
+export function acceptRideAsDriver(rideId, driver = getDemoUser(), vehicleModel = 'Standard AC Cab') {
+  const rides = getStoredRides();
+  const rideIndex = rides.findIndex((r) => r.id === rideId);
+
+  if (rideIndex === -1) {
+    return { success: false, message: 'Ride not found.' };
+  }
+
+  const ride = rides[rideIndex];
+  if (ride.driverId && ride.status === 'Driver Confirmed') {
+    return { success: false, message: 'This ride has already been accepted by a driver.' };
+  }
+
+  ride.driverId = driver.id || `drv-${Date.now()}`;
+  ride.driverName = driver.name || 'Verified Driver';
+  ride.driverRole = driver.role || 'Verified Commuter Driver';
+  ride.driverRating = 4.9;
+  ride.vehicleModel = vehicleModel || ride.vehicleModel || 'Standard AC Cab';
+  ride.status = 'Driver Confirmed';
+  ride.acceptedAt = new Date().toISOString();
+
+  rides[rideIndex] = { ...ride };
+  saveStoredRides(rides);
+
+  return {
+    success: true,
+    ride,
+    message: `You have accepted this ride as Driver (${ride.driverName})!`,
+  };
+}
+
+/**
  * Retrieve rides created by demo user
  */
 export function getDemoUserRides(userId = getDemoUser().id) {

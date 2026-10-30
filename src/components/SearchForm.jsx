@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import LocationAutocompleteInput from './LocationAutocompleteInput';
 import { MapPin, Navigation, Calendar, Users, ArrowRightLeft, Search, RotateCcw } from 'lucide-react';
 
 const getInitialTodayDate = () => new Date().toISOString().split('T')[0];
@@ -102,15 +103,13 @@ export default function SearchForm({
             <MapPin className="w-3.5 h-3.5 text-emerald-600" />
             Origin
           </label>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="e.g. Rani Kamlapati"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              className="w-full pl-3.5 pr-3 py-2.5 sm:py-3 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-900 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium transition placeholder:text-slate-400 outline-none"
-            />
-          </div>
+          <LocationAutocompleteInput
+            placeholder="e.g. Rani Kamlapati"
+            value={origin}
+            onChange={(e) => setOrigin(e.target.value)}
+            onPlaceSelect={(place) => setOrigin(place.address || place.name)}
+            icon={null}
+          />
         </div>
 
         {/* Swap button on desktop */}
@@ -131,15 +130,13 @@ export default function SearchForm({
             <Navigation className="w-3.5 h-3.5 text-emerald-600" />
             Destination
           </label>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="e.g. Lalghati"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              className="w-full pl-3.5 pr-3 py-2.5 sm:py-3 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-900 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium transition placeholder:text-slate-400 outline-none"
-            />
-          </div>
+          <LocationAutocompleteInput
+            placeholder="e.g. Lalghati"
+            value={destination}
+            onChange={(e) => setDestination(e.target.value)}
+            onPlaceSelect={(place) => setDestination(place.address || place.name)}
+            icon={null}
+          />
         </div>
 
         {/* Travel Date */}

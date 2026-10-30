@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SearchForm from '../components/SearchForm';
 import { POPULAR_ROUTES } from '../data/mockRides';
+import heroBg from '../assets/hero-bg.jpg';
 import {
   Car,
   Search,
@@ -28,59 +29,70 @@ export default function HomePage() {
   return (
     <div className="flex-1 bg-slate-50">
       
-      {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/70 via-white to-slate-50 border-b border-emerald-100/60 pt-10 pb-16 sm:pt-16 sm:pb-24">
-        {/* Subtle background ambient ring */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[400px] bg-emerald-200/20 blur-3xl rounded-full pointer-events-none -z-10" />
+      {/* 1. HERO SECTION WITH IMAGE BACKGROUND */}
+      <section className="relative overflow-hidden border-b border-emerald-100/60 pt-3 sm:pt-4 pb-16 sm:pb-24">
+        {/* Background Image Container with Lighter Gradient Overlay for higher image opacity */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src={heroBg}
+            alt="SAWARI Shared Ride Background"
+            className="w-full h-full object-cover object-top"
+          />
+          {/* Transparent at the top so the SAWARI logo & name are completely crisp, clear, and visible */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/15 to-slate-50/60" />
+        </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto space-y-4">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto">
             
-            {/* Tagline Pill */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold shadow-xs">
+            {/* Tagline Pill - positioned ABOVE the SAWARI logo */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold shadow-xs">
               <Sparkles className="w-4 h-4 text-emerald-600" />
               <span>Your Destination. Your People. Shared Ride.</span>
             </div>
 
-            {/* Main Heading */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-950 tracking-tight leading-[1.15]">
-              Your Journey, <span className="text-emerald-600">Shared.</span>
-            </h1>
+            {/* Main Content - positioned BELOW the SAWARI logo & pin */}
+            <div className="pt-24 sm:pt-28 md:pt-32 lg:pt-36 space-y-4">
+              {/* Main Heading */}
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-950 tracking-tight leading-[1.15] drop-shadow-sm">
+                Your Journey, <span className="text-emerald-600">Shared.</span>
+              </h1>
 
-            {/* Description */}
-            <p className="text-base sm:text-lg lg:text-xl text-slate-600 leading-relaxed font-normal max-w-2xl mx-auto">
-              Find people travelling your way and share the cost of your cab journey. Connect with college peers and budget travelers to save up to 75% on intercity cabs.
-            </p>
+              {/* Description */}
+              <p className="text-base sm:text-lg lg:text-xl text-slate-900 leading-relaxed font-semibold max-w-2xl mx-auto drop-shadow-2xs">
+                Find people travelling your way and share the cost of your cab journey. Connect with college peers and budget travelers to save up to 75% on intercity cabs.
+              </p>
 
-            {/* Action Buttons */}
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-              <Link
-                to="/rides"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm sm:text-base shadow-md shadow-emerald-600/25 transition-all hover:-translate-y-0.5"
-              >
-                <Search className="w-4 h-4" />
-                <span>Find Shared Rides</span>
-              </Link>
-              <Link
-                to="/create-ride"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-sm sm:text-base shadow-xs transition-all hover:-translate-y-0.5"
-              >
-                <PlusCircle className="w-4 h-4 text-emerald-600" />
-                <span>Offer a Ride</span>
-              </Link>
-            </div>
+              {/* Action Buttons */}
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+                <Link
+                  to="/rides"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm sm:text-base shadow-md shadow-emerald-600/35 transition-all hover:-translate-y-0.5"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Find Shared Rides</span>
+                </Link>
+                <Link
+                  to="/create-ride"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-sm sm:text-base shadow-xs backdrop-blur-md transition-all hover:-translate-y-0.5"
+                >
+                  <PlusCircle className="w-4 h-4 text-emerald-600" />
+                  <span>Offer a Ride</span>
+                </Link>
+              </div>
 
-            {/* Key trust bullets */}
-            <div className="pt-3 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs font-medium text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Split Fare Equally
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Verified Student Network
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Zero Platform Commission
-              </span>
+              {/* Key trust bullets */}
+              <div className="pt-3 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs font-bold text-slate-800">
+                <span className="flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Split Fare Equally
+                </span>
+                <span className="flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Verified Student Network
+                </span>
+                <span className="flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Zero Platform Commission
+                </span>
+              </div>
             </div>
 
           </div>

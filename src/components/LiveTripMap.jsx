@@ -1,5 +1,31 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Navigation, ExternalLink } from 'lucide-react';
+import L from 'leaflet';
+import { isGoogleMapsKeyAvailable, loadGoogleMaps } from '../utils/googleMapsLoader';
+
+const createCabDivIcon = () => {
+  return L.divIcon({
+    className: 'custom-cab-marker',
+    html: `
+      <div style="
+        background-color: #059669;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 3px solid #ffffff;
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
+        font-size: 18px;
+      ">
+        🚖
+      </div>
+    `,
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+    popupAnchor: [0, -20],
+  });
+};
 
 export default function LiveTripMap({
   latitude,
@@ -7,163 +33,178 @@ export default function LiveTripMap({
   driverName = 'Driver',
   accuracy = 0,
   speed = 0,
-  heading = 0,
+  heading: _heading = 0,
   isSharing = true,
   isDriver = false,
 }) {
-  const mapRef = useRef(null);
-  const googleMapInstance = useRef(null);
-  const markerInstance = useRef(null);
-  const [mapsLoaded, setMapsLoaded] = useState(() =>
-    Boolean(typeof window !== 'undefined' && window.google && window.google.maps)
-  );
-  const [mapError, setMapError] = useState(false);
+  const mapContainerRef = useRef(null);
 
-  const googleApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  // Google Maps refs
+  const googleMapRef = useRef(null);
+  const googleMarkerRef = useRef(null);
 
-  // Load Google Maps JavaScript API
+  // Leaflet refs
+  const leafletMapRef = useRef(null);
+  const leafletMarkerRef = useRef(null);
+  const leafletCircleRef = useRef(null);
+
+  const [mapType, setMapType] = useState('none'); // 'google' | 'leaflet' | 'none'
+  const hasGoogleKey = isGoogleMapsKeyAvailable();
+
+  const initialCoordsRef = useRef({
+    lat: latitude ? Number(latitude) : 23.2599,
+    lng: longitude ? Number(longitude) : 77.4126,
+    driverName,
+  });
+
+  // Initialize Map: Try Google Maps if key available, else Leaflet
   useEffect(() => {
-    if (typeof window === 'undefined' || (window.google && window.google.maps)) {
-      return;
+    if (!mapContainerRef.current) return;
+
+    let isMounted = true;
+    const initialLat = initialCoordsRef.current.lat;
+    const initialLng = initialCoordsRef.current.lng;
+    const name = initialCoordsRef.current.driverName;
+
+    if (hasGoogleKey) {
+      loadGoogleMaps()
+        .then((maps) => {
+          if (!isMounted || !mapContainerRef.current) return;
+
+          const gMap = new maps.Map(mapContainerRef.current, {
+            center: { lat: initialLat, lng: initialLng },
+            zoom: 16,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+          });
+
+          const gMarker = new maps.Marker({
+            position: { lat: initialLat, lng: initialLng },
+            map: gMap,
+            title: `${name}'s Live Cab`,
+            animation: maps.Animation.DROP,
+          });
+
+          const infoWindow = new maps.InfoWindow({
+            content: `
+              <div style="padding: 4px; font-family: sans-serif; font-size: 12px; font-weight: bold;">
+                🚖 ${name}'s Live Cab<br/>
+                <span style="color: #059669; font-size: 11px;">GPS Live Broadcasting</span>
+              </div>
+            `,
+          });
+          gMarker.addListener('click', () => infoWindow.open(gMap, gMarker));
+
+          googleMapRef.current = gMap;
+          googleMarkerRef.current = gMarker;
+          setMapType('google');
+        })
+        .catch(() => {
+          // Fallback to Leaflet if Google Maps loading fails
+          if (isMounted) initLeaflet(initialLat, initialLng, name);
+        });
+    } else {
+      initLeaflet(initialLat, initialLng, name);
     }
 
-    if (!googleApiKey) {
-      // If no API key is provided, visual GPS radar map handles display
-      return;
+    function initLeaflet(lat, lng, nameStr) {
+      if (!mapContainerRef.current || leafletMapRef.current) return;
+
+      const lMap = L.map(mapContainerRef.current, {
+        center: [lat, lng],
+        zoom: 15,
+        zoomControl: true,
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(lMap);
+
+      const lMarker = L.marker([lat, lng], {
+        icon: createCabDivIcon(),
+      }).addTo(lMap);
+
+      lMarker.bindPopup(`
+        <div style="font-family: sans-serif; font-size: 12px;">
+          <strong>🚖 ${nameStr}'s Live Cab</strong><br/>
+          <span style="color: #059669; font-weight: bold;">GPS Active</span>
+        </div>
+      `);
+
+      leafletMapRef.current = lMap;
+      leafletMarkerRef.current = lMarker;
+      setMapType('leaflet');
+
+      const handleResize = () => lMap.invalidateSize();
+      window.addEventListener('resize', handleResize);
     }
 
-    const scriptId = 'sawari-google-maps-script';
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleApiKey}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => setMapsLoaded(true);
-      script.onerror = () => setMapError(true);
-      document.head.appendChild(script);
-    }
-  }, [googleApiKey]);
+    return () => {
+      isMounted = false;
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+    };
+  }, [hasGoogleKey]);
 
-  // Initialize or update Google Map
+  // Update Coordinates
   useEffect(() => {
-    if (!mapsLoaded || !mapRef.current || !window.google || !window.google.maps) {
-      return;
-    }
-
     if (!latitude || !longitude) return;
 
-    const latLng = { lat: Number(latitude), lng: Number(longitude) };
+    const lat = Number(latitude);
+    const lng = Number(longitude);
 
-    if (!googleMapInstance.current) {
-      googleMapInstance.current = new window.google.maps.Map(mapRef.current, {
-        center: latLng,
-        zoom: 16,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }],
-          },
-        ],
-      });
-
-      markerInstance.current = new window.google.maps.Marker({
-        position: latLng,
-        map: googleMapInstance.current,
-        title: `${driverName}'s Cab`,
-        animation: window.google.maps.Animation.DROP,
-      });
-
-      const infoWindow = new window.google.maps.InfoWindow({
-        content: `<div style="padding: 4px; font-weight: bold; font-family: sans-serif; font-size: 13px;">
-          🚖 ${driverName}'s Live Cab<br/>
-          <span style="font-size: 11px; color: #16a34a;">GPS Active</span>
-        </div>`,
-      });
-
-      markerInstance.current.addListener('click', () => {
-        infoWindow.open(googleMapInstance.current, markerInstance.current);
-      });
-    } else {
-      // Pan to updated coordinates
-      googleMapInstance.current.panTo(latLng);
-      if (markerInstance.current) {
-        markerInstance.current.setPosition(latLng);
-      }
+    // Update Google Maps
+    if (mapType === 'google' && googleMapRef.current && googleMarkerRef.current) {
+      const latLng = { lat, lng };
+      googleMapRef.current.panTo(latLng);
+      googleMarkerRef.current.setPosition(latLng);
     }
-  }, [mapsLoaded, latitude, longitude, driverName]);
 
-  const googleMapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+    // Update Leaflet Map
+    if (mapType === 'leaflet' && leafletMapRef.current && leafletMarkerRef.current) {
+      leafletMarkerRef.current.setLatLng([lat, lng]);
+
+      if (accuracy && accuracy > 0) {
+        if (!leafletCircleRef.current) {
+          leafletCircleRef.current = L.circle([lat, lng], {
+            radius: Math.min(accuracy, 100),
+            color: '#059669',
+            fillColor: '#10b981',
+            fillOpacity: 0.15,
+            weight: 1,
+          }).addTo(leafletMapRef.current);
+        } else {
+          leafletCircleRef.current.setLatLng([lat, lng]);
+          leafletCircleRef.current.setRadius(Math.min(accuracy, 100));
+        }
+      }
+
+      leafletMapRef.current.panTo([lat, lng], { animate: true });
+    }
+  }, [latitude, longitude, mapType, accuracy]);
 
   return (
     <div className="space-y-3">
       {/* Map Container */}
       <div className="relative w-full h-72 sm:h-80 rounded-2xl overflow-hidden border border-slate-200 shadow-md bg-slate-100">
-        
-        {/* If Google Maps script is active */}
-        {mapsLoaded && !mapError && googleApiKey ? (
-          <div ref={mapRef} className="w-full h-full" />
-        ) : (
-          /* Interactive High-Res Visual GPS Map View */
-          <div className="w-full h-full relative flex flex-col items-center justify-center p-4 overflow-hidden bg-slate-900 text-white">
-            {/* Ambient grid lines */}
-            <div
-              className="absolute inset-0 opacity-20"
-              style={{
-                backgroundImage:
-                  'radial-gradient(circle, #10b981 1px, transparent 1px), linear-gradient(to right, #334155 1px, transparent 1px), linear-gradient(to bottom, #334155 1px, transparent 1px)',
-                backgroundSize: '24px 24px',
-              }}
-            />
-
-            {/* Radar scan ring */}
-            <div className="absolute w-64 h-64 rounded-full border border-emerald-500/30 animate-ping opacity-25 pointer-events-none" />
-            <div className="absolute w-44 h-44 rounded-full border border-emerald-400/40 pointer-events-none" />
-            <div className="absolute w-24 h-24 rounded-full border border-emerald-300/60 pointer-events-none" />
-
-            {/* Center vehicle pin with heading orientation */}
-            <div className="relative z-10 flex flex-col items-center space-y-1.5 animate-bounce duration-1000">
-              <div
-                className="w-12 h-12 rounded-2xl bg-emerald-600 border-2 border-white text-white flex items-center justify-center shadow-lg shadow-emerald-500/50"
-                style={{ transform: `rotate(${heading || -45}deg)` }}
-              >
-                <Navigation className="w-6 h-6" />
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-950/90 text-emerald-300 text-[11px] font-bold border border-emerald-500/40 shadow-xs">
-                {driverName}'s Cab
-              </span>
-            </div>
-
-            {/* Floating Live Badge */}
-            <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/90 backdrop-blur-md border border-slate-700 text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-400 font-bold">Live GPS Tracking</span>
-            </div>
-
-            {/* Google Maps link button */}
-            <a
-              href={googleMapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 hover:bg-white text-slate-900 text-xs font-bold transition shadow-md"
-            >
-              <span>View in Google Maps</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        )}
+        <div ref={mapContainerRef} className="w-full h-full z-0" />
 
         {/* Live Trip Sharing Badge */}
         {isSharing && (
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-md">
+          <div className="absolute top-3 right-3 z-500 flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-md">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
             <span>{isDriver ? 'Sharing Location' : 'Live from Driver'}</span>
           </div>
         )}
+
+        {/* Map Engine Badge */}
+        <div className="absolute bottom-3 left-3 z-500 px-2 py-0.5 rounded-md bg-white/90 backdrop-blur-xs border border-slate-200 text-[10px] font-mono font-bold text-slate-700 shadow-xs">
+          {mapType === 'google' ? 'Google Maps GPS' : 'Live GPS Map'}
+        </div>
       </div>
 
       {/* GPS Telemetry Bar */}
@@ -171,14 +212,14 @@ export default function LiveTripMap({
         <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5">
           <span className="text-slate-400 block font-medium">Latitude</span>
           <span className="font-mono font-bold text-slate-800 text-xs">
-            {Number(latitude).toFixed(5)}° N
+            {latitude ? `${Number(latitude).toFixed(5)}° N` : '23.25990° N'}
           </span>
         </div>
 
         <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5">
           <span className="text-slate-400 block font-medium">Longitude</span>
           <span className="font-mono font-bold text-slate-800 text-xs">
-            {Number(longitude).toFixed(5)}° E
+            {longitude ? `${Number(longitude).toFixed(5)}° E` : '77.41260° E'}
           </span>
         </div>
 
@@ -192,7 +233,7 @@ export default function LiveTripMap({
         <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5">
           <span className="text-slate-400 block font-medium">Travel Speed</span>
           <span className="font-bold text-emerald-700 text-xs">
-            {speed ? `${Math.round(speed * 3.6)} km/h` : 'En Route / Active'}
+            {speed ? `${Math.round(speed * 3.6)} km/h` : 'Active GPS Signal'}
           </span>
         </div>
       </div>

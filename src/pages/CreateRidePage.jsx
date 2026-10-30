@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { addStoredRide, formatDate } from '../utils/storage';
+import { addStoredRide, formatDate, getCurrentUser, getDemoUser } from '../utils/storage';
+import LocationAutocompleteInput from '../components/LocationAutocompleteInput';
+import RideRouteMap from '../components/RideRouteMap';
 import {
   PlusCircle,
   MapPin,
   Calendar,
   IndianRupee,
-  User,
   ArrowRightLeft,
   CheckCircle2,
   AlertCircle,
   Sparkles,
   Search,
+  Navigation,
 } from 'lucide-react';
 
 const getInitialTodayDate = () => new Date().toISOString().split('T')[0];
@@ -36,8 +38,6 @@ export default function CreateRidePage() {
   const today = getInitialTodayDate();
 
   const [formData, setFormData] = useState({
-    driverName: '',
-    driverRole: '',
     origin: '',
     pickupLocation: '',
     destination: '',
@@ -52,6 +52,9 @@ export default function CreateRidePage() {
 
   const [errors, setErrors] = useState({});
   const [createdRide, setCreatedRide] = useState(null);
+  const [originCoords, setOriginCoords] = useState(null);
+  const [destinationCoords, setDestinationCoords] = useState(null);
+  const [calculatedRoute, setCalculatedRoute] = useState(null);
 
   const bhopalLocations = [
     'Rani Kamlapati',
@@ -86,15 +89,24 @@ export default function CreateRidePage() {
       pickupLocation: prev.dropLocation,
       dropLocation: prev.pickupLocation,
     }));
+    const tempCoords = originCoords;
+    setOriginCoords(destinationCoords);
+    setDestinationCoords(tempCoords);
+  };
+
+  const handleLocationSelect = ({ type, lat, lng, address }) => {
+    if (type === 'origin') {
+      handleInputChange('origin', address);
+      setOriginCoords({ lat, lng });
+    } else {
+      handleInputChange('destination', address);
+      setDestinationCoords({ lat, lng });
+    }
   };
 
   // Validate form
   const validateForm = () => {
     const newErrors = {};
-
-    if (!formData.driverName.trim()) {
-      newErrors.driverName = 'Driver Name is required.';
-    }
 
     if (!formData.origin.trim()) {
       newErrors.origin = 'Origin location is required.';
@@ -143,15 +155,21 @@ export default function CreateRidePage() {
       return;
     }
 
+    const currentUser = getCurrentUser() || getDemoUser();
     const totalSeatsNum = Number(formData.totalSeats);
     const totalFareNum = Number(formData.totalFare);
     const perPassengerFare = Math.round(totalFareNum / totalSeatsNum);
 
     const newRide = {
       id: `swr-${Date.now()}`,
-      driverName: formData.driverName.trim(),
-      driverRole: formData.driverRole.trim() || 'Verified Student Commuter',
-      driverRating: 5.0,
+      creatorId: currentUser.id,
+      creatorName: currentUser.name || 'Student Commuter',
+      creatorRole: currentUser.role || 'Student Commuter',
+      driverId: null,
+      driverName: null,
+      driverRole: null,
+      driverRating: null,
+      status: 'Pending Driver',
       origin: formData.origin.trim(),
       pickupLocation:
         formData.pickupLocation.trim() || `${formData.origin.trim()} Main Pickup Point`,
@@ -164,11 +182,10 @@ export default function CreateRidePage() {
       availableSeats: totalSeatsNum,
       totalFare: totalFareNum,
       farePerPassenger: perPassengerFare,
-      vehicleModel: formData.vehicleModel.trim() || 'Standard AC Cab',
+      vehicleModel: formData.vehicleModel.trim() || 'Cab assigned upon acceptance',
       notes:
         formData.notes.trim() ||
-        'Shared cab ride. Split fare equally among passengers upon reaching.',
-      createdByDemo: true,
+        'Shared cab ride requested. Looking for co-passengers and a driver.',
       createdAt: new Date().toISOString(),
     };
 
@@ -181,8 +198,6 @@ export default function CreateRidePage() {
 
   const handleReset = () => {
     setFormData({
-      driverName: '',
-      driverRole: '',
       origin: '',
       pickupLocation: '',
       destination: '',
@@ -215,13 +230,13 @@ export default function CreateRidePage() {
                 <CheckCircle2 className="w-9 h-9 stroke-[2.5]" />
               </div>
               <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider">
-                Confirmed & Saved
+                Ride Request Posted
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Your Shared Ride is Live!
+                Your Shared Ride Request is Live!
               </h2>
               <p className="text-sm text-slate-600 max-w-md mx-auto">
-                Your ride has been saved and is now discoverable by students and co-passengers in Find Rides.
+                Your ride request has been saved and is now discoverable in Find Rides. A verified driver can accept your ride, and co-passengers can join.
               </p>
             </div>
 
@@ -265,11 +280,22 @@ export default function CreateRidePage() {
                 </div>
               </div>
 
-              <div className="pt-2 text-xs text-slate-600 border-t border-slate-200/60 flex items-center justify-between">
-                <span>Driver: <strong className="text-slate-800">{createdRide.driverName}</strong></span>
+              <div className="pt-2 text-xs text-slate-600 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2">
+                <span>Posted by: <strong className="text-slate-800">{createdRide.creatorName || 'Student Commuter'}</strong></span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200">
+                  ⏳ Awaiting Driver Acceptance
+                </span>
                 <span>Total Cab Cost: <strong className="text-slate-800">₹{createdRide.totalFare}</strong></span>
               </div>
             </div>
+
+            {/* Route Map Preview in Confirmation */}
+            <RideRouteMap
+              origin={createdRide.origin}
+              destination={createdRide.destination}
+              heightClass="h-56 sm:h-64"
+              title="Confirmed Cab Route"
+            />
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -298,13 +324,13 @@ export default function CreateRidePage() {
             <div>
               <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100/90 px-3 py-1 rounded-full mb-2 border border-emerald-200">
                 <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
-                Offer a Shared Ride
+                Post a Shared Ride Request
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">
-                Create a Ride
+                Create a Ride Request
               </h1>
               <p className="text-slate-600 text-sm sm:text-base mt-1">
-                Post your upcoming cab journey and invite co-passengers to share the fare.
+                Post your travel route and schedule. A driver will accept your ride, and co-passengers can split the fare.
               </p>
             </div>
 
@@ -328,58 +354,12 @@ export default function CreateRidePage() {
                 </div>
               )}
 
-              {/* 1. Driver Profile Section */}
+              {/* 1. Route Locations */}
               <div className="space-y-4">
-                <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <User className="w-4 h-4 text-emerald-600" />
-                  1. Driver Information
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Driver Name <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Aman Sharma"
-                      value={formData.driverName}
-                      onChange={(e) => handleInputChange('driverName', e.target.value)}
-                      className={`w-full px-3.5 py-2.5 sm:py-3 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-900 rounded-xl border text-sm font-medium transition outline-none ${
-                        errors.driverName
-                          ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                          : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
-                      }`}
-                    />
-                    {errors.driverName && (
-                      <p className="text-rose-600 text-xs font-medium mt-1">
-                        {errors.driverName}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Role / Campus Tag <span className="text-slate-400 font-normal">(Optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. MANIT Student, LNCT 3rd Year"
-                      value={formData.driverRole}
-                      onChange={(e) => handleInputChange('driverRole', e.target.value)}
-                      className="w-full px-3.5 py-2.5 sm:py-3 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-900 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium transition outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-
-              {/* 2. Route Details */}
-              <div className="space-y-4 pt-4 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-emerald-600" />
-                    2. Route Locations
+                    1. Route Locations
                   </h3>
                   <button
                     type="button"
@@ -396,16 +376,23 @@ export default function CreateRidePage() {
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       Origin (From) <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Rani Kamlapati"
+                    <LocationAutocompleteInput
+                      placeholder="e.g. Rani Kamlapati, Bhopal"
                       value={formData.origin}
                       onChange={(e) => handleInputChange('origin', e.target.value)}
-                      className={`w-full px-3.5 py-2.5 sm:py-3 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-900 rounded-xl border text-sm font-medium transition outline-none ${
+                      onPlaceSelect={(place) => {
+                        handleInputChange('origin', place.address || place.name);
+                        if (place.lat && place.lng) {
+                          setOriginCoords({ lat: place.lat, lng: place.lng });
+                        }
+                      }}
+                      icon={MapPin}
+                      iconColor="text-emerald-600"
+                      className={
                         errors.origin
                           ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                          : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
-                      }`}
+                          : ''
+                      }
                     />
                     {errors.origin && (
                       <p className="text-rose-600 text-xs font-medium mt-1">{errors.origin}</p>
@@ -416,16 +403,23 @@ export default function CreateRidePage() {
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       Destination (To) <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Lalghati"
+                    <LocationAutocompleteInput
+                      placeholder="e.g. Lalghati, Bhopal"
                       value={formData.destination}
                       onChange={(e) => handleInputChange('destination', e.target.value)}
-                      className={`w-full px-3.5 py-2.5 sm:py-3 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-900 rounded-xl border text-sm font-medium transition outline-none ${
+                      onPlaceSelect={(place) => {
+                        handleInputChange('destination', place.address || place.name);
+                        if (place.lat && place.lng) {
+                          setDestinationCoords({ lat: place.lat, lng: place.lng });
+                        }
+                      }}
+                      icon={Navigation}
+                      iconColor="text-rose-600"
+                      className={
                         errors.destination
                           ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                          : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
-                      }`}
+                          : ''
+                      }
                     />
                     {errors.destination && (
                       <p className="text-rose-600 text-xs font-medium mt-1">
@@ -433,6 +427,31 @@ export default function CreateRidePage() {
                       </p>
                     )}
                   </div>
+                </div>
+
+                {/* Interactive Google Map Preview & Route Display */}
+                <div className="pt-2">
+                  <RideRouteMap
+                    origin={formData.origin}
+                    destination={formData.destination}
+                    originCoords={originCoords}
+                    destinationCoords={destinationCoords}
+                    interactive={true}
+                    onLocationSelect={handleLocationSelect}
+                    onRouteCalculated={(info) => setCalculatedRoute(info)}
+                    title="Interactive Route & Location Picker"
+                    heightClass="h-64 sm:h-80"
+                  />
+                  {calculatedRoute && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-xs flex items-center justify-between text-emerald-950">
+                      <span className="font-medium text-emerald-800">
+                        Calculated Driving Route:
+                      </span>
+                      <span className="font-extrabold text-emerald-700 bg-white px-2.5 py-1 rounded-md border border-emerald-200">
+                        {calculatedRoute.distanceText} • approx {calculatedRoute.durationText}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Quick Bhopal Chips */}
@@ -489,11 +508,11 @@ export default function CreateRidePage() {
               </div>
 
 
-              {/* 3. Schedule & Seats */}
+              {/* 2. Travel Schedule & Seats */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-emerald-600" />
-                  3. Travel Schedule & Seats
+                  2. Travel Schedule & Seats
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -545,7 +564,7 @@ export default function CreateRidePage() {
                   {/* Total Seats */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Total Seats Offered <span className="text-rose-500">*</span>
+                      Total Seats Needed <span className="text-rose-500">*</span>
                     </label>
                     <select
                       value={formData.totalSeats}
@@ -564,11 +583,11 @@ export default function CreateRidePage() {
               </div>
 
 
-              {/* 4. Fare & Vehicle Details */}
+              {/* 3. Fare & Vehicle Preferences */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <IndianRupee className="w-4 h-4 text-emerald-600" />
-                  4. Fare Estimation & Vehicle
+                  3. Fare Estimation & Cab Preferences
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -605,11 +624,11 @@ export default function CreateRidePage() {
                   {/* Vehicle Model */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Vehicle Model <span className="text-slate-400 font-normal">(Optional)</span>
+                      Preferred Vehicle <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Swift Dzire, WagonR, Uber Premier"
+                      placeholder="e.g. Swift Dzire, Sedan AC, Any Hatchback"
                       value={formData.vehicleModel}
                       onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
                       className="w-full px-3.5 py-2.5 sm:py-3 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-900 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium transition outline-none"
@@ -643,14 +662,14 @@ export default function CreateRidePage() {
               </div>
 
 
-              {/* 5. Additional Notes */}
+              {/* 4. Additional Notes */}
               <div className="space-y-2 pt-4 border-t border-slate-100">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Ride Notes / Preferences <span className="text-slate-400 font-normal">(Optional)</span>
                 </label>
                 <textarea
                   rows="2"
-                  placeholder="e.g. Non-smoking cab, punctual departure, plenty of boot space for bags."
+                  placeholder="e.g. Punctual departure from station, plenty of luggage space, polite co-travelers."
                   value={formData.notes}
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-900 rounded-xl border border-slate-200 focus:border-emerald-500 text-xs sm:text-sm font-medium transition outline-none resize-none"
@@ -672,7 +691,7 @@ export default function CreateRidePage() {
                     className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm shadow-md shadow-emerald-600/25 hover:shadow-lg transition-all cursor-pointer"
                   >
                     <PlusCircle className="w-4 h-4 stroke-[2.5]" />
-                    <span>Create & Publish Ride</span>
+                    <span>Post Ride Request</span>
                   </button>
                 </div>
               </div>
