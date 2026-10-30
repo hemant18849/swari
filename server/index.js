@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+              
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/sawari_db';
 
 app.use(cors());
@@ -261,6 +262,6 @@ app.get('/api/location/:rideId', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT,"0.0.0.0", () => {
   console.log(`SAWARI Live Location Express Server running on port ${PORT}`);
 });
